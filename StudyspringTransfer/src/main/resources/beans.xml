@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<beans>
+    <!-- id标识对象，class为类的全限定名-->
+    <bean id="accountDao" class="com.cy.edu.dao.impl.JdbcAccountDaoImpl">
+        <property name="connectionUtils" ref="connectionUtils"></property>
+    </bean>
+    <bean id="transferService" class="com.cy.edu.service.impl.TransferServiceImpl">
+        <!--通过name锁定到传值的set方法，通过反射技术调用该方法传入相应的值-->
+        <property name="accountDao" ref="accountDao"></property>
+    </bean>
+    <bean id="connectionUtils" class="com.cy.edu.utils.ConnectionUtils">
+    </bean>
+    <bean id="transactionManager" class="com.cy.edu.utils.TransactionManager">
+        <property name="connectionUtils" ref="connectionUtils"></property>
+    </bean>
+    <bean id="proxyFactory" class="com.cy.edu.factory.ProxyFactory">
+        <property name="transactionManager" ref="transactionManager"></property>
+    </bean>
+</beans>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+        https://www.springframework.org/schema/beans/spring-beans.xsd">
+    <!-- id标识对象，class为类的全限定名-->
+    <bean id="accountDao" class="com.cy.edu.dao.impl.JdbcAccountDaoImpl" scope="singleton">
+        <property name="connectionUtils" ref="connectionUtils"></property>
+    </bean>
+    <bean id="transferService" class="com.cy.edu.service.impl.TransferServiceImpl">
+        <!--通过name锁定到传值的set方法，通过反射技术调用该方法传入相应的值-->
+        <property name="accountDao" ref="accountDao"></property>
+    </bean>
+
+    <bean id="transactionManager" class="com.cy.edu.utils.TransactionManager">
+        <!--set注入，其他bean使用ref，普通值使用value-->
+        <property name="connectionUtils" ref="connectionUtils"></property>
+        <!--<property name="name" value="123"></property>-->
+        <!--<constructor-arg index="0" ref="connectionUtils"/>-->
+        <!--<constructor-arg index="1" value="123"/>-->
+        <!--数组-->
+       <!-- <property name="myArray">
+            <array>
+                <ref bean="connectionUtils"></ref>
+                <value></value>
+            </array>
+        </property>
+        &lt;!&ndash;map&ndash;&gt;
+        <property name="myMap">
+            <map>
+                <entry key="" value=""/>
+                <entry key-ref="" value-ref=""/>
+            </map>
+        </property>
+        &lt;!&ndash;set&ndash;&gt;
+        <property name="mySet">
+            <set>
+                <value></value>
+            </set>
+        </property>
+        &lt;!&ndash;Properties&ndash;&gt;
+        <property name="myProperty">
+            <props>
+                <prop key="">value1</prop>
+            </props>
+        </property>-->
+    </bean>
+    <bean id="proxyFactory" class="com.cy.edu.factory.ProxyFactory">
+        <property name="transactionManager" ref="transactionManager"></property>
+    </bean>
+    <!--使用无参构造函数实例化对象-->
+    <!--<bean id="connectionUtils" class="com.cy.edu.utils.ConnectionUtils">-->
+    <!--</bean>-->
+    <!--使用静态方法创建-->
+    <!--<bean id="connectionUtils" class="com.cy.edu.factory.CreateBeanFactory" factory-method="getInstanceStatic"/>-->
+    <!--使用实例化方法-->
+    <bean id="createBeanFactory" class="com.cy.edu.factory.CreateBeanFactory"/>
+    <bean id="connectionUtils" factory-bean="createBeanFactory" factory-method="getInstance"/>
+</beans>
