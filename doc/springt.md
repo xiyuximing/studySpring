@@ -578,6 +578,148 @@ set注入
 
 #### 使用XML和注解相结合方式
 
+| xml配置                  | 对应注解                                                     |
+| ------------------------ | ------------------------------------------------------------ |
+| \<bean/>                 | @Component、@Controller、@Service、@Repository，四个注解用法一样，只不过用来区别于控制层、服务层、数据层。如果不配置id属性，默认为这个bean的id名为首字母小写 |
+| \<bean/>中scope属性      | @Scope("prototype")，默认单例，注解加在类上                  |
+| 标签的init-method属性    | @PostConstruct，注解加在⽅法上，该⽅法就是初始化后调⽤的⽅法 |
+| 标签的destory-method属性 | @PreDestory，注解加在⽅法上，该⽅法就是销毁前调⽤的⽅法      |
+
+DI注解方式：
+
+@Autowired:默认按类型注入
+
+@Qualifier:指定注入那个对象
+
+``` java
+@Repository("accountDao")
+public class JdbcAccountDaoImpl implements AccountDao {
+
+    @Autowired
+    @Qualifier("connectionUtils")
+    private ConnectionUtils connectionUtils;
+
+    @Autowired
+    public void setConnectionUtils(ConnectionUtils connectionUtils) {
+        this.connectionUtils = connectionUtils;
+    }
+}
+```
+
+@Resource:不推荐
+
+@Resource 注解由 J2EE 提供，需要导⼊包 javax.annotation.Resource。
+@Resource 默认按照 ByName ⾃动注⼊。
+
+- 如果同时指定了 name 和 type，则从Spring上下⽂中找到唯⼀匹配的bean进⾏装配，找不到则抛出异常。
+- 如果指定了 name，则从上下⽂中查找名称（id）匹配的bean进⾏装配，找不到则抛出异常。
+- 如果指定了 type，则从上下⽂中找到类似匹配的唯⼀bean进⾏装配，找不到或是找到多个，都会抛出异常。
+- 如果既没有指定name，⼜没有指定type，则⾃动按照byName⽅式进⾏装配；
+
+#### 纯注解模式
+
+**@Configuration：**申明当前类是个配置类
+
+**@ComponentScan(basePackages = {"com.cy.edu"})：**扫描包，可以配置多个
+
+**@PropertySource({"classpath:jdbc.properties"})：**读取外部资源文件
+
+**@Value("${jdbc.driver}")：**对变量赋值，可以直接赋值，也可以使⽤ ${} 读取资源配置⽂件中的信息
+
+**@Bean:**将⽅法返回对象加⼊ SpringIOC 容器
+
+**@Import:**引⼊其他配置类
+
+```java
+@Configuration
+@ComponentScan(basePackages = {"com.cy.edu"})
+@PropertySource({"classpath:jdbc.properties"})
+@Import()
+public class SpringConfig {
+
+    @Value("${jdbc.driver}")
+    private String driverClassName;
+    @Value("${jdbc.url}")
+    private String url;
+    @Value("${jdbc.username}")
+    private String username;
+    @Value("${jdbc.password}")
+    private String password;
+
+    @Bean("dataSource")
+    public DataSource dataSource() {
+        DruidDataSource dataSource = new DruidDataSource();
+        dataSource.setDriverClassName(driverClassName);
+        dataSource.setUrl(url);
+        dataSource.setUsername(username);
+        dataSource.setPassword(password);
+        return dataSource;
+    }
+}
+```
+
+启动方式：
+
+javaSE：使用AnnotationConfigApplicationContext
+
+``` java
+ApplicationContext applicationContext = new AnnotationConfigApplicationContext(SpringConfig.class);
+```
+
+Web启动：配置web.xml
+
+``` xml
+  <!--告诉ContextLoaderListener是通过注解方式启动IOC容器-->
+  <context-param>
+    <param-name>contextClass</param-name>
+    <param-value>org.springframework.web.context.support.AnnotationConfigWebApplicationContext</param-value>
+  </context-param>
+  <context-param>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>com.cy.edu.SpringConfig</param-value>
+  </context-param>
+  <!--使用spring监听器启动IOC-->
+  <listener>
+    <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+  </listener>
+```
+
+### 4.3 lazy-Init 延迟加载
+
+ApplicationContext 容器的默认⾏为是在启动服务器时将所有 **singleton bean** 提前进⾏实例化。提前实例化意味着作为初始化过程的⼀部分ApplicationContext 实例会创建并配置所有的singleton bean。
+
+设置 lazy-init 为 true 的 bean 将不会在 ApplicationContext 启动时提前被实例化，⽽是第⼀次向容器通过 **getBean** 索取 bean 时实例化的。如果⼀个设置了⽴即加载的 bean1，引⽤了⼀个延迟加载的 bean2 ，那么 bean1 在容器启动时被实例化，⽽ bean2 由于被 bean1 引⽤，所以也被实例化，这种情况也符合延时加载的 bean 在第⼀次调⽤时才被实例化的规则。
+
+**如果⼀个 bean 的 scope 属性为 scope="pototype" 时，即使设置了 lazy-init="false"，容器启动时也不会实例化bean，⽽是调⽤ getBean ⽅法实例化的。**
+
+#### 配置方式
+
+``` xml
+<bean id="testBean" calss="cn.lagou.LazyBean" lazy-init="true" />
+或者
+<beans default-lazy-init="true" xmlns="http://www.springframework.org/schema/beans"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+        https://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        https://www.springframework.org/schema/context/spring-context.xsd">
+
+```
+
+或者使用@Lazy注解
+
+``` java
+@Lazy
+public class JdbcAccountDaoImpl implements AccountDao {
+}
+```
+
+#### 使用场景
+
+- 开启延迟加载⼀定程度提⾼容器启动和运转性能
+- 对于不常使⽤的 Bean 设置延迟加载，这样偶尔使⽤的时候再加载，不必要从⼀开始该 Bean 就占⽤资源
+
 
 
 # 代理模式
