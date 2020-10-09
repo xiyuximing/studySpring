@@ -3,26 +3,20 @@ package com.cy.edu.service.impl;
 import com.cy.edu.dao.AccountDao;
 import com.cy.edu.pojo.Account;
 import com.cy.edu.service.TransferService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 /**
  * @author 应癫
  */
+@Service("transferService")
 public class TransferServiceImpl implements TransferService {
 
-//    private AccountDao accountDao = new JdbcAccountDaoImpl();
-    /**
-     * 改成工厂调用
-     */
-//    private AccountDao accountDao = (AccountDao)BeanFactory.getBean("accountDao");
 
+    @Autowired
     private AccountDao accountDao;
 
-    //通过构造函数或set传值
-
-
-    public void setAccountDao(AccountDao accountDao) {
-        this.accountDao = accountDao;
-    }
 
     @Override
     public void transfer(String fromCardNo, String toCardNo, int money) throws Exception {

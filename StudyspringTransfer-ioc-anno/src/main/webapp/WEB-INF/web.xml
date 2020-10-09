@@ -5,9 +5,23 @@
 <web-app>
   <display-name>Archetype Created Web Application</display-name>
   <!--配置application.xml的路径-->
-  <context-param>
+<!--  <context-param>
     <param-name>contextConfigLocation</param-name>
     <param-value>classpath:applicationContext.xml</param-value>
+  </context-param>
+  &lt;!&ndash;使用spring监听器启动IOC&ndash;&gt;
+  <listener>
+    <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+  </listener>-->
+
+  <!--告诉ContextLoaderListener是通过注解方式启动IOC容器-->
+  <context-param>
+    <param-name>contextClass</param-name>
+    <param-value>org.springframework.web.context.support.AnnotationConfigWebApplicationContext</param-value>
+  </context-param>
+  <context-param>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>com.cy.edu.SpringConfig</param-value>
   </context-param>
   <!--使用spring监听器启动IOC-->
   <listener>

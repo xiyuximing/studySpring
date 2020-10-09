@@ -3,7 +3,11 @@ package com.cy.edu.dao.impl;
 import com.cy.edu.pojo.Account;
 import com.cy.edu.dao.AccountDao;
 import com.cy.edu.utils.ConnectionUtils;
-import com.cy.edu.utils.DruidUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -12,21 +16,17 @@ import java.sql.ResultSet;
 /**
  * @author 应癫
  */
+@Repository("accountDao")
+@Lazy
 public class JdbcAccountDaoImpl implements AccountDao {
 
+    @Autowired
+    @Qualifier("connectionUtils")
     private ConnectionUtils connectionUtils;
 
+    @Autowired
     public void setConnectionUtils(ConnectionUtils connectionUtils) {
         this.connectionUtils = connectionUtils;
-    }
-
-
-    public void init() {
-        System.out.println("初始化方法.....");
-    }
-
-    public void destory() {
-        System.out.println("销毁方法......");
     }
 
     @Override

@@ -5,6 +5,8 @@ import net.sf.cglib.proxy.Callback;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -12,23 +14,12 @@ import java.lang.reflect.Proxy;
 /**
  * Created by Yang on 2020/10/6.
  */
+@Component("proxyFactory")
 public class ProxyFactory {
 
-/*    private ProxyFactory(){
-
-    }
-
-    private static final ProxyFactory instance = new ProxyFactory();
-
-    public static ProxyFactory getInstance() {
-        return instance;
-    }*/
-
+    @Autowired
     private TransactionManager transactionManager;
 
-    public void setTransactionManager(TransactionManager transactionManager) {
-        this.transactionManager = transactionManager;
-    }
 
     public Object getJdkProxy(Object o) {
         return Proxy.newProxyInstance(o.getClass().getClassLoader(), o.getClass().getInterfaces(), ((proxy, method, args) -> {
