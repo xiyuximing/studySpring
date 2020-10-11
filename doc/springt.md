@@ -720,6 +720,572 @@ public class JdbcAccountDaoImpl implements AccountDao {
 - 开启延迟加载⼀定程度提⾼容器启动和运转性能
 - 对于不常使⽤的 Bean 设置延迟加载，这样偶尔使⽤的时候再加载，不必要从⼀开始该 Bean 就占⽤资源
 
+### 4.4 BeanFactory和FactoryBean
+
+**BeanFactory接⼝**是容器的顶级接⼝，定义了容器的⼀些基础⾏为，负责⽣产和管理Bean的⼀个⼯⼚，具体使⽤它下⾯的⼦接⼝类型，⽐ApplicationContext；
+Spring中Bean有两种，⼀种是普通Bean，⼀种是⼯⼚Bean（FactoryBean），FactoryBean可以⽣成某⼀个类型的Bean实例（返回给我们），也就是说我们可以借助于它⾃定义Bean的创建过程。
+
+**Bean创建的三种⽅式中的静态⽅法和实例化⽅法和FactoryBean作⽤类似**，FactoryBean使⽤较多，尤其在Spring框架⼀些组件中会使⽤，还有其他框架和Spring框架整合时使⽤。
+
+``` java
+// 可以让我们⾃定义Bean的创建过程（完成复杂Bean的定义）
+public interface FactoryBean<T> {
+  @Nullable
+  // 返回FactoryBean创建的Bean实例，如果isSingleton返回true，则该实例会放到Spring容器
+  的单例对象缓存池中Map
+  T getObject() throws Exception;
+  @Nullable
+  // 返回FactoryBean创建的Bean类型
+  Class<?> getObjectType();
+  // 返回作⽤域是否单例
+  default boolean isSingleton() {
+  	return true;
+  }
+}
+```
+
+**使用方式：**
+
+新建实体类：
+
+``` java
+public class Company {
+
+    private String name;
+
+    private String address;
+
+    private Integer scale;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public Integer getScale() {
+        return scale;
+    }
+
+    public void setScale(Integer scale) {
+        this.scale = scale;
+    }
+
+    @Override
+    public String toString() {
+        return "Company{" +
+                "name='" + name + '\'' +
+                ", address='" + address + '\'' +
+                ", scale=" + scale +
+                '}';
+    }
+```
+
+新建factorybean
+
+``` java
+@Component("company")
+public class CompanyFactoryBean implements FactoryBean {
+
+    @Value("名称,地址,10")
+    private String companyInfo;// 公司名称,地址,规模
+    public void setCompanyInfo(String companyInfo) {
+        this.companyInfo = companyInfo;
+    }
+
+    @Override
+    public Company getObject() throws Exception {
+        // 模拟创建复杂对象Company
+        Company company = new Company();
+        String[] strings = companyInfo.split(",");
+        company.setName(strings[0]);
+        company.setAddress(strings[1]);
+        company.setScale(Integer.parseInt(strings[2]));
+        return company;
+    }
+
+    @Override
+    public Class<?> getObjectType() {
+        return Company.class;
+    }
+
+    @Override
+    public boolean isSingleton() {
+        return false;
+    }
+}
+```
+
+测试使用
+
+``` java
+        ApplicationContext applicationContext = new AnnotationConfigApplicationContext(SpringConfig.class);
+        //获取companybean
+        Object o = applicationContext.getBean("company");
+        System.out.println(o);
+        //获取factorybean
+        o = applicationContext.getBean("&company");
+        System.out.println(o);
+```
+
+
+
+### 4.5 后置处理器
+
+Spring提供了两种后处理bean的扩展接⼝，分别为 BeanPostProcessor 和BeanFactoryPostProcessor，两者在使⽤上是有所区别的。
+⼯⼚初始化（BeanFactory）—> Bean对象
+
+**BeanFactoryPostProcessor**是用来在BeanFactory初始化之后进行一些后置处理的。
+
+**BeanPostProcessor**是在Bean对象实例化（**并不是Bean整个生命周期完成之后**）之后进行后置处理做一些事情。
+
+**对象不⼀定是springbean，⽽springbean⼀定是个对象**
+
+#### SpringBean生命周期
+
+![image-20201011111928291](https://gitee.com/xiyuximing/image/raw/master/image-20201011111928291.png)
+
+1. 根据配置调用Bean的构造方法或工厂方法实例化Bean
+2. 利用依赖注入完成Bean中所有属性值的配置注入
+3. 若Bean实现了BeanNameAware接口，则Spring调用Bean的setBeanName()方法传入当前bean的id值
+4. 若Bean实现了BeanFactoryAware接口，则Spring调用setBeanFactory()方法传入当前工场实例的引用
+5. 若Bean实现了ApplicationContextAware接口，则Spring调用setApplicationContext()方法传入当前ApplicationContext实例的引用
+6. 若BeanPostProcessor和Bean关联，则Spring将调用该接口的预初始化方法postProcessBeforeInitialzation()方法对bean进行加工操作。**SpringAop就是通过它实现的**。
+7. 若Bean实现了InitializingBean接口，则Spring将调用afterPropertiesSet()方法。
+8. 若配置文件中配置了init-method属性制定了初始化方法，则调用该方法。
+9. 若BeanPostProcessor和Bean关联，则Spring将调用该接口的初始化方法postProcessAfterInitialization()方法。此时，**Bean已经可以被应用系统使用了**。
+10. 若此bean的作用范围为singleton单例，则将该Bean放入SpringIOC的缓存池中，将触发Spring对该Bean生命周期的管理。若为prototype，则将该Bean交给调用者。
+11. 若Bean实现了DisposableBean接口，则Spring会调用destory()方法对Bean进行销毁。若在配置文件中通过destory-method属性指定了Bean的销毁方法，则Spring将调用该方法对Bean进行销毁。
+
+
+
+实体类bean
+
+``` java
+public class Result implements BeanNameAware,BeanFactoryAware,ApplicationContextAware,InitializingBean, DisposableBean {
+
+    private String status;
+    private String message;
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    @Override
+    public String toString() {
+        return "Result{" +
+                "status='" + status + '\'' +
+                ", message='" + message + '\'' +
+                '}';
+    }
+
+    @Override
+    public void setBeanName(String name) {
+        System.out.println("注册我成为bean时定义的id：" + name);
+    }
+
+    @Override
+    public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+        System.out.println("管理我的beanfactory为：" + beanFactory);
+    }
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        System.out.println("高级容器接口ApplicationContext：" + applicationContext);
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        System.out.println("afterPropertiesSet......");
+    }
+
+
+    public void initMethod() {
+        System.out.println("init-method....");
+    }
+
+    @PostConstruct
+    public void postCoustrcut() {
+        System.out.println("postCoustrcut");
+    }
+
+
+    @PreDestroy
+    public void PreDestroy(){
+        System.out.println("PreDestroy...");
+    }
+
+    @Override
+    public void destroy() throws Exception {
+        System.out.println("destroy.....");
+    }
+}
+```
+
+BeanPostProcessor
+
+``` java
+@Component
+public class MyBeanPostProcessor implements BeanPostProcessor {
+
+    @Override
+    public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+        if("lazyResult".equalsIgnoreCase(beanName)) {
+            System.out.println("MyBeanPostProcessor  before方法拦截处理lazyResult");
+        }
+
+        return bean;
+    }
+
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+        if("lazyResult".equalsIgnoreCase(beanName)) {
+            System.out.println("MyBeanPostProcessor  after方法拦截处理lazyResult");
+        }
+        return bean;
+    }
+}
+```
+
+测试输出：
+
+``` 
+注册我成为bean时定义的id：lazyResult
+管理我的beanfactory为：org.springframework.beans.factory.support.DefaultListableBeanFactory@76f2b07d: defining beans [org.springframework.context.annotation.internalConfigurationAnnotationProcessor,org.springframework.context.annotation.internalAutowiredAnnotationProcessor,org.springframework.context.annotation.internalCommonAnnotationProcessor,org.springframework.context.event.internalEventListenerProcessor,org.springframework.context.event.internalEventListenerFactory,springConfig,accountDao,company,myBeanPostProcessor,proxyFactory,lazyResult,transferService,connectionUtils,transactionManager,dataSource]; root of factory hierarchy
+高级容器接口ApplicationContext：org.springframework.context.annotation.AnnotationConfigApplicationContext@4141d797, started on Sun Oct 11 11:45:38 CST 2020
+MyBeanPostProcessor  before方法拦截处理lazyResult
+postCoustrcut
+afterPropertiesSet......
+MyBeanPostProcessor  after方法拦截处理lazyResult
+Result{status='null', message='null'}
+PreDestroy...
+destroy.....
+```
+
+
+
+#### BeanPostProcessor
+
+BeanPostProcessor是针对Bean级别的处理，可以针对某个具体的Bean.
+
+``` java
+public interface BeanPostProcessor {
+    @Nullable
+    default Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+        return bean;
+    }
+
+    @Nullable
+    default Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+        return bean;
+    }
+}
+```
+
+该接⼝提供了两个⽅法，分别在Bean的初始化⽅法前和初始化⽅法后执⾏，具体这个初始化⽅法指的是什么⽅法，类似我们在定义bean时，定义了init-method所指定的⽅法。
+定义⼀个类实现了BeanPostProcessor，默认是会对整个Spring容器中所有的bean进⾏处理。如果要对具体的某个bean处理，可以通过⽅法参数判断，两个类型参数分别为Object和String，第⼀个参数是每个bean的实例，第⼆个参数是每个bean的name或者id属性的值。所以我们可以通过第⼆个参数，来判断我们将要处理的具体的bean。
+注意：**处理是发⽣在Spring容器的实例化和依赖注⼊之后**。
+
+#### BeanFactoryPostProcessor
+
+BeanFactory级别的处理，是针对整个Bean的⼯⼚进⾏处理，典型应⽤:PropertyPlaceholderConfigurer读取xml配置文件中的propertites属性。
+
+``` java
+@FunctionalInterface
+public interface BeanFactoryPostProcessor {
+    void postProcessBeanFactory(ConfigurableListableBeanFactory var1) throws BeansException;
+}
+```
+
+此接⼝只提供了⼀个⽅法，⽅法参数为ConfigurableListableBeanFactory，该参数类型定义了⼀些⽅法:
+
+![image-20201011115136658](https://gitee.com/xiyuximing/image/raw/master/image-20201011115136658.png)
+
+其中有个⽅法名为getBeanDefinition的⽅法，我们可以根据此⽅法，找到我们定义bean 的BeanDefinition对象。然后我们可以对定义的属性进⾏修改。
+
+![image-20201011115301666](https://gitee.com/xiyuximing/image/raw/master/image-20201011115301666.png)
+
+BeanDefinition⽅法名字类似我们bean标签的属性，setBeanClassName对应bean标签中的class属性，所以当我们拿到BeanDefinition对象时，我们可以⼿动修改bean标签中所定义的属性值。
+**BeanDefinition对象**：我们在 XML 中定义的 bean标签，Spring 解析 bean 标签成为⼀个 JavaBean，这个JavaBean 就是 BeanDefinition
+**注意：**调⽤ BeanFactoryPostProcessor ⽅法时，这时候bean还没有实例化，此时 bean 刚被解析成BeanDefinition对象
+
+## 5、源码
+
+- 源码阅读原则
+  - 定焦原则：抓主线
+  - 宏观原则：关注源码结构和业务流程（淡化具体某⾏代码的编写细节）
+- 读源码的⽅法和技巧
+  - 断点（观察调⽤栈）
+  - 反调（Find Usages）
+  - 经验（spring框架中doXXX，做具体处理的地⽅）
+- 编译工程
+  - 使用gradle
+  - 编译⼯程（顺序：core-oxm-context-beans-aspects-aop）
+    - ⼯程—>tasks—>compileTestJava
+
+### 1、Spring IoC容器初始化主体流程
+
+#### Spring IoC的容器体系
+
+IoC容器是Spring的核⼼模块，是抽象了对象管理、依赖关系管理的框架解决⽅案。Spring 提供了很多的容器，其中 BeanFactory 是顶层容器（根容器），不能被实例化，它定义了所有 IoC 容器 必须遵从的⼀套原则，具体的容器实现可以增加额外的功能，⽐如我们常⽤到的ApplicationContext，其下更具体的实现如 ClassPathXmlApplicationContext 包含了解析 xml 等⼀系列的内容，AnnotationConfigApplicationContext 则是包含了注解解析等⼀系列的内容。Spring IoC 容器继承体系⾮常聪明，需要使⽤哪个层次⽤哪个层次即可，不必使⽤功能⼤⽽全的。
+
+BeanFactory 顶级接⼝⽅法栈如下：
+
+![image-20201011183336069](https://gitee.com/xiyuximing/image/raw/master/image-20201011183336069.png)
+
+
+
+BeanFactory容器继承体系
+
+![image-20201011183607334](https://gitee.com/xiyuximing/image/raw/master/image-20201011183607334.png)
+
+通过其接⼝设计，我们可以看到我们⼀贯使⽤的 ApplicationContext 除了继承BeanFactory的⼦接⼝，还继承了ResourceLoader、MessageSource等接⼝，因此其提供的功能也就更丰富了。
+
+ApplicationContext是容器的高级接口，BeanFacotry是顶级容器/根容器，规范了/定义了容器的基础行为。
+
+Spring应用上下文，官方称之为 IoC容器。错误的认识：容器就是map而已；准确来说，map是ioc容器的一个成员，叫做单例池, singletonObjects,容器是一组组件和过程的集合，包括BeanFactory、单例池、BeanPostProcessor等以及之间的协作流程
+
+#### Bean⽣命周期关键时机点
+
+**思路：**创建⼀个类 LagouBean ，让其实现⼏个特殊的接⼝，并分别在接⼝实现的构造器、接⼝⽅法中断点，观察线程调⽤栈，分析出 Bean 对象创建和管理关键点的触发时机。
+
+结论：
+
+- 在未设置延迟加载的前提下，Bean 的创建是在容器初始化过程中完成的
+
+- 构造函数的调⽤时机在AbstractApplicationContext类refresh⽅法的finishBeanFactoryInitialization(beanFactory)处
+
+- InitializingBean中afterPropertiesSet ⽅法的调⽤时机也是在AbstractApplicationContext类refresh⽅法的finishBeanFactoryInitialization(beanFactory)
+
+- BeanFactoryPostProcessor 初始化在AbstractApplicationContext类refresh⽅法的invokeBeanFactoryPostProcessors(beanFactory)处;postProcessBeanFactory方法调⽤在AbstractApplicationContext类refresh⽅法的invokeBeanFactoryPostProcessors(beanFactory);
+
+- BeanPostProcessor 初始化在AbstractApplicationContext类refresh⽅法的registerBeanPostProcessors(beanFactory);postProcessBeforeInitialization 调⽤在AbstractApplicationContext类refresh⽅法的finishBeanFactoryInitialization(beanFactory);postProcessAfterInitialization 调⽤在AbstractApplicationContext类refresh⽅法的finishBeanFactoryInitialization(beanFactory);
+
+- | 关键点                            | 触发代码                                                     |
+  | --------------------------------- | ------------------------------------------------------------ |
+  | 构造器                            | AbstractApplicationContext#refresh#finishBeanFactoryInitialization(beanFactory)(beanFactory) |
+  | BeanFactoryPostProcessor 初始化   | AbstractApplicationContext#refresh#invokeBeanFactoryPostProcessors(beanFactory) |
+  | BeanFactoryPostProcessor ⽅法调用 | AbstractApplicationContext#refresh#invokeBeanFactoryPostProcessors(beanFactory) |
+  | BeanPostProcessor 初始化          | AbstractApplicationContext#refresh#registerBeanPostProcessors(beanFactory) |
+  | BeanPostProcessor ⽅法调用        | AbstractApplicationContext#refresh#finishBeanFactoryInitialization(beanFactory) |
+
+  
+
+#### Spring IoC容器初始化主流程
+
+由上分析可知，Spring IoC 容器初始化的关键环节就在 AbstractApplicationContext#refresh() ⽅法中，我们查看 refresh ⽅法来俯瞰容器创建的主体流程
+
+``` java
+public void refresh() throws BeansException, IllegalStateException {
+		// 对象锁加锁
+		synchronized (this.startupShutdownMonitor) {
+			/*
+				Prepare this context for refreshing.
+			 	刷新前的预处理
+			 	表示在真正做refresh操作之前需要准备做的事情：
+					设置Spring容器的启动时间，
+					开启活跃状态，撤销关闭状态
+					验证环境信息里一些必须存在的属性等
+			 */
+			prepareRefresh();
+
+			/*
+				Tell the subclass to refresh the internal bean factory.
+			 	获取BeanFactory；默认实现是DefaultListableBeanFactory
+                加载BeanDefition 并注册到 BeanDefitionRegistry
+			 */
+			ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+
+			/*
+				Prepare the bean factory for use in this context.
+				BeanFactory的预准备工作（BeanFactory进行一些设置，比如context的类加载器等）
+			 */
+			prepareBeanFactory(beanFactory);
+
+			try {
+				/*
+					Allows post-processing of the bean factory in context subclasses.
+					BeanFactory准备工作完成后进行的后置处理工作
+				 */
+				postProcessBeanFactory(beanFactory);
+
+				/*
+					Invoke factory processors registered as beans in the context.
+					实例化实现了BeanFactoryPostProcessor接口的Bean，并调用接口方法
+				 */
+				invokeBeanFactoryPostProcessors(beanFactory);
+
+				/*
+					Register bean processors that intercept bean creation.
+					注册BeanPostProcessor（Bean的后置处理器），在创建bean的前后等执行
+				 */
+				registerBeanPostProcessors(beanFactory);
+
+				/*
+					Initialize message source for this context.
+					初始化MessageSource组件（做国际化功能；消息绑定，消息解析）；
+				 */
+				initMessageSource();
+
+				/*
+					Initialize event multicaster for this context.
+					初始化事件派发器
+				 */
+				initApplicationEventMulticaster();
+
+				/*
+					Initialize other special beans in specific context subclasses.
+					子类重写这个方法，在容器刷新的时候可以自定义逻辑；如创建Tomcat，Jetty等WEB服务器
+				 */
+				onRefresh();
+
+				/*
+					Check for listener beans and register them.
+					注册应用的监听器。就是注册实现了ApplicationListener接口的监听器bean
+				 */
+				registerListeners();
+
+				/*
+					Instantiate all remaining (non-lazy-init) singletons.
+					初始化所有剩下的非懒加载的单例bean
+					初始化创建非懒加载方式的单例Bean实例（未设置属性）
+                    填充属性
+                    初始化方法调用（比如调用afterPropertiesSet方法、init-method方法）
+                    调用BeanPostProcessor（后置处理器）对实例bean进行后置处理
+				 */
+				finishBeanFactoryInitialization(beanFactory);
+
+				/*
+					Last step: publish corresponding event.
+					完成context的刷新。主要是调用LifecycleProcessor的onRefresh()方法，并且发布事件（ContextRefreshedEvent）
+				 */
+				finishRefresh();
+        ......
+			}
+    }
+}
+```
+
+### 2、 BeanFactory创建流程
+
+#### 获取BeanFactory⼦流程
+
+
+
+#### BeanDefinition加载解析及注册⼦流程
+
+### 3、Bean创建流程
+
+
+
+### 4、lazy-init 延迟加载机制原理
+
+- lazy-init 延迟加载机制分析：
+
+  普通 Bean 的初始化是在容器启动初始化阶段执⾏的，⽽被lazy-init=true修饰的 bean 则是在从容器⾥第⼀次进⾏context.getBean() 时进⾏触发。Spring 启动的时候会把所有bean信息(包括XML和注解)解析转化成Spring能够识别的BeanDefinition并存到Hashmap⾥供下⾯的初始化时⽤，然后对每个BeanDefinition进⾏处理，如果是懒加载的则在容器初始化阶段不处理，其他的则在容器初始化阶段进⾏初始化并依赖注⼊。
+
+- 对于被修饰为lazy-init的bean Spring 容器初始化阶段不会进⾏ init 并且依赖注⼊，当第⼀次进⾏getBean时候才进⾏初始化并依赖注⼊
+- 对于⾮懒加载的bean，getBean的时候会从缓存⾥头获取，因为容器初始化阶段 Bean 已经初始化完成并缓存了起来
+
+
+
+### 5、Spring IoC循环依赖问题
+
+#### 什么是循环依赖
+
+循环依赖其实就是循环引⽤，也就是两个或者两个以上的 Bean 互相持有对⽅，最终形成闭环。⽐如A依赖于B，B依赖于C，C⼜依赖于A。
+
+Spring中循环依赖场景有：
+
+- 构造器的循环依赖（构造器注⼊）
+- Field 属性的循环依赖（set注⼊）
+
+其中，构造器的循环依赖问题⽆法解决，只能拋出 BeanCurrentlyInCreationException 异常，在解决属性循环依赖时，spring采⽤的是提前暴露对象的⽅法。
+
+#### 循环依赖处理机制
+
+- 单例 bean 构造器参数循环依赖（⽆法解决）
+
+- prototype 原型 bean循环依赖（⽆法解决）
+
+  对于原型bean的初始化过程中不论是通过构造器参数循环依赖还是通过setXxx⽅法产⽣循环依赖，Spring都 会直接报错处理。
+
+
+
+- 单例bean通过setXxx或者@Autowired进⾏循环依赖
+
+  **通过三级缓存机制**
+
+  ![image-20201011222047374](https://gitee.com/xiyuximing/image/raw/master/image-20201011222047374.png)
+
+  Spring 的循环依赖的理论依据基于 Java 的引⽤传递，当获得对象的引⽤时，对象的属性是可以延后设置的，但是构造器必须是在获取引⽤之前。
+
+  Spring通过setXxx或者@Autowired⽅法解决循环依赖其实是通过提前暴露⼀个ObjectFactory对象来完成的，简单来说ClassA在调⽤构造器完成对象初始化之后，在调⽤ClassA的setClassB⽅法之前就把ClassA实例化的对象通过ObjectFactory提前暴露到Spring容器中。
+
+  1. Spring容器初始化ClassA通过构造器初始化对象后提前暴露到Spring容器,放入3级缓存中
+  2. ClassA调⽤setClassB⽅法，Spring⾸先尝试从容器中获取ClassB，此时ClassB不存在Spring容器中
+  3. Spring容器初始化ClassB，同时也会将ClassB提前暴露到Spring容器中
+  4. ClassB调⽤setClassA⽅法，Spring从容器中获取ClassA ，因为第⼀步中已经提前暴露了ClassA，因此可以获取到ClassA实例
+  5. 这样ClassA和ClassB都完成了对象初始化操作，解决了循环依赖问题
+
+
+
+## 6、Spring AOP 应⽤
+
+AOP本质：在不改变原有业务逻辑的情况下增强横切逻辑，横切逻辑代码往往是权限校验代码、⽇志代码、事务控制代码、性能监控代码
+
+### 1、AOP相关术语
+
+| 名词              | 解释                                                         |
+| ----------------- | ------------------------------------------------------------ |
+| Joinpoint(连接点) | 它指的是那些可以⽤于把增强代码加⼊到业务主线中的点，这些点指的就是⽅法。在⽅法执⾏的前后通过动态代理技术加⼊增强的代码。在Spring框架AOP思想的技术实现中，也只⽀持⽅法类型的连接点。 |
+| Pointcut(切⼊点)  | 它指的是那些已经把增强代码加⼊到业务主线进来之后的连接点。由上图中，我们看出表现层transfer ⽅法就只是连接点，因为判断访问权限的功能并没有对其增强。 |
+| Advice(通知/增强) | 它指的是切⾯类中⽤于提供增强功能的⽅法。并且不同的⽅法增强的时机是不⼀样的。⽐如，开启事务肯定要在业务⽅法执⾏之前执⾏；提交事务要在业务⽅法正常执⾏之后执⾏，⽽回滚事务要在业务⽅法执⾏产⽣异常之后执⾏等等。那么这些就是通知的类型。其分类有：前置通知 后置通知 异常通知 最终通知 环绕通知。 |
+| Target(⽬标对象)  | 它指的是代理的⽬标对象。即被代理对象。                       |
+| Proxy(代理)       | 它指的是⼀个类被AOP织⼊增强后，产⽣的代理类。即代理对象。    |
+| Weaving(织⼊)     | 它指的是把增强应⽤到⽬标对象来创建新的代理对象的过程。spring采⽤动态代理织⼊，⽽AspectJ采⽤编译期织⼊和类装载期织⼊。 |
+| Aspect(切⾯)      | 它指定是增强的代码所关注的⽅⾯，把这些相关的增强代码定义到⼀个类中，这个类就是切⾯类。例如，事务切⾯，它⾥⾯定义的⽅法就是和事务相关的，像开启事务，提交事务，回滚事务等等，不会定义其他与事务⽆关的⽅法。TrasnactionManager 就是⼀个切⾯。 |
+
+**连接点：**⽅法开始时、结束时、正常运⾏完毕时、⽅法异常时等这些特殊的时机点，我们称之为连接点，项⽬中每个⽅法都有连接点，连接点是⼀种候选点
+
+**切⼊点：**指定AOP思想想要影响的具体⽅法是哪些，描述感兴趣的⽅法
+
+**Advice增强：**
+
+	1. 指的是横切逻辑
+ 	2. ⽅位点（在某⼀些连接点上加⼊横切逻辑，那么这些连接点就叫做⽅位点，描述的是具体的特殊时机）
+
+**Aspect切⾯：**切⾯概念是对上述概念的⼀个综合
+
+​	Aspect切⾯= 切⼊点+增强
+​						= 切⼊点（锁定⽅法） + ⽅位点（锁定⽅法中的特殊时机）+ 横切逻辑
+
+**众多的概念，⽬的就是为了锁定要在哪个地⽅插⼊什么横切逻辑代码**
+
+### 2、Spring中AOP的代理选择
+
 
 
 # 代理模式
