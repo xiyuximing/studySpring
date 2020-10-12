@@ -1274,7 +1274,8 @@ AOP本质：在不改变原有业务逻辑的情况下增强横切逻辑，横�
 
 **Advice增强：**
 
-	1. 指的是横切逻辑
+1. 指的是横切逻辑
+
  	2. ⽅位点（在某⼀些连接点上加⼊横切逻辑，那么这些连接点就叫做⽅位点，描述的是具体的特殊时机）
 
 **Aspect切⾯：**切⾯概念是对上述概念的⼀个综合
@@ -1285,6 +1286,325 @@ AOP本质：在不改变原有业务逻辑的情况下增强横切逻辑，横�
 **众多的概念，⽬的就是为了锁定要在哪个地⽅插⼊什么横切逻辑代码**
 
 ### 2、Spring中AOP的代理选择
+
+Spring 实现AOP思想使⽤的是动态代理技术。
+
+默认情况下，Spring会根据被代理对象是否实现接⼝来选择使⽤JDK还是CGLIB。当被代理对象没有实现任何接⼝时，Spring会选择CGLIB。当被代理对象实现了接⼝，Spring会选择JDK官⽅的代理技术，不过我们可以通过配置的⽅式，让Spring强制使⽤CGLIB。
+
+### 3、Spring中AOP使用
+
+#### 通知类型
+
+- **前置通知**
+
+  在切⼊点⽅法（业务核⼼⽅法）执⾏之前执⾏。
+
+  前置通知可以获取切⼊点⽅法的参数，并对其进⾏增强
+
+  配置方式：
+
+  1. 通过xml
+
+     ``` xml
+     <aop:before method="printLog" pointcut-ref="pointcut1"></aop:before>
+     ```
+
+  2. 通过注解
+
+     @before
+
+- **正常执⾏时通知**
+
+  正常执行后通知
+
+  配置方式：
+
+  1. 通过xml
+
+     ``` xml
+     <aop:after-returning method="afterReturningPrintLog" pointcutref="pt1"></aop:after-returning>
+     ```
+
+  2. 通过注解
+
+     @AfterReturning
+
+- **异常通知**
+
+  异常通知的执⾏时机是在切⼊点⽅法（业务核⼼⽅法）执⾏产⽣异常之后，异常通知执⾏。如果切⼊点⽅法执⾏没有产⽣异常，则异常通知不会执⾏。
+
+  异常通知不仅可以获取切⼊点⽅法执⾏的参数，也可以获取切⼊点⽅法执⾏产⽣的异常信息.
+
+  配置方式：
+
+  1. 通过xml
+
+     ``` xml
+     <aop:after-throwing method="afterThrowingPrintLog" pointcut-ref="pt1"></aop:after-throwing>
+     ```
+
+  2. 通过注解
+
+     @AfterThrowing
+
+- **最终通知**
+
+  ⽆论切⼊点⽅法执⾏是否产⽣异常，它都会在返回之前执⾏。
+
+  最终通知执⾏时，可以获取到通知⽅法的参数。同时它可以做⼀些清理操作.
+
+  配置方式：
+
+  1. 通过xml
+
+     ``` xml
+     <aop:after method="afterPrintLog" pointcut-ref="pt1"></aop:after>
+     ```
+
+  2. 通过注解
+
+     @After
+
+- **环绕通知**
+
+  是Spring框架为我们提供的⼀种可以通过编码的⽅式，控制增强代码何时执⾏的通知类型。它⾥⾯借助的ProceedingJoinPoint接⼝及其实现类，实现⼿动触发切⼊点⽅法的调⽤.
+
+  配置方式：
+
+  1. 通过xml
+
+     ``` xml
+     <aop:around method="aroundPrintLog" pointcut-ref="pt1"></aop:around>
+     ```
+
+  2. 通过注解
+
+     @Around
+
+#### 相关依赖
+
+``` xml
+<dependency>
+  <groupId>org.springframework</groupId>
+  <artifactId>spring-aop</artifactId>
+  <version>5.1.12.RELEASE</version>
+</dependency>
+<dependency>
+  <groupId>org.aspectj</groupId>
+  <artifactId>aspectjweaver</artifactId>
+  <version>1.9.4</version>
+</dependency>
+```
+
+#### 使用XML模式
+
+1. 配置xml
+
+   ``` xml
+   <!--
+   Spring基于XML的AOP配置前期准备：
+   在spring的配置⽂件中加⼊aop的约束
+   xmlns:aop="http://www.springframework.org/schema/aop"
+   http://www.springframework.org/schema/aop
+   https://www.springframework.org/schema/aop/spring-aop.xsd-->
+   <!--把通知bean交给spring来管理-->
+   <bean id="logUtil" class="com.lagou.utils.LogUtil"></bean>
+   <!--开始aop的配置-->
+   <aop:config>
+     <!--配置切⾯-->
+     <aop:aspect id="logAdvice" ref="logUtil">
+     <!--配置前置通知 method:⽤于指定后置通知的⽅法名称 pointcut:⽤于指定切⼊点表达式 pointcut-ref:⽤于指定切⼊点表达式的引⽤-->
+     <aop:before method="printLog" pointcut="execution(public * com.service.impl.*.*(..))"></aop:before>
+     </aop:aspect>
+   </aop:config>
+   ```
+
+   **切入点表达式：**
+
+   访问修饰符 返回值 包名.包名.包名.类名.⽅法名(参数列表)
+
+   如：public void com.service.impl.TransferServiceImpl.updateAccountByCardNo(com.pojo.Account)
+
+   其中访问修饰符可省略
+
+   返回值可用*标识任意返回值
+
+   包名可以使⽤.表示任意包
+
+   包名可以使⽤..表示当前包及其⼦包
+
+   类名和⽅法名，都可以使⽤.表示任意类，任意⽅法
+
+   参数列表，可以使⽤具体类型，基本类型直接写类型名称 ： int；引⽤类型必须写全限定类名：java.lang.String
+
+   可以使⽤*，表示任意参数类型，但是必须有参数
+
+   参数列表可以使⽤..，表示有⽆参数均可。有参数可以是任意类型
+
+   **改变代理方式：**
+
+   通过以下配置强制使用CGLIB的方式进行动态代理。二选一
+
+   ``` xml
+   <aop:config proxy-target-class="true">
+   或
+   <!--此标签是基于XML和注解组合配置AOP时的必备标签，表示Spring开启注解配置AOP的⽀持-->
+   <aop:aspectj-autoproxy proxy-target-class="true"></aop:aspectjautoproxy>
+   ```
+
+#### XML+注解模式
+
+在xml中配置开启对注解的支持
+
+``` xml
+<!--开启spring对注解aop的⽀持-->
+<aop:aspectj-autoproxy/>
+```
+
+相关注解
+
+@Aspect
+
+@Pointcut
+
+@Before
+
+@AfterReturning
+
+@AfterThrowing
+
+@After
+
+@Around
+
+``` java
+@Component
+@Aspect
+public class LogUtil {
+  /*** 第⼀步：编写⼀个⽅法
+* 第⼆步：在⽅法使⽤@Pointcut注解
+* 第三步：给注解的value属性提供切⼊点表达式
+* 细节：
+* 1.在引⽤切⼊点表达式时，必须是⽅法名+()，例如"pointcut()"。
+* 2.在当前切⾯中使⽤，可以直接写⽅法名。在其他切⾯中使⽤必须是全限定⽅法名。
+*/
+  @Pointcut("execution(* com.lagou.service.impl.*.*(..))")
+  public void pointcut(){}
+  @Before("pointcut()")
+  public void beforePrintLog(JoinPoint jp){
+    Object[] args = jp.getArgs();
+    System.out.println("前置通知：beforePrintLog，参数是："+Arrays.toString(args));
+  }
+  @AfterReturning(value = "pointcut()",returning = "rtValue")
+  public void afterReturningPrintLog(Object rtValue){
+  	System.out.println("后置通知：afterReturningPrintLog，返回值是："+rtValue);
+  }
+  @AfterThrowing(value = "pointcut()",throwing = "e")
+  public void afterThrowingPrintLog(Throwable e){
+  	System.out.println("异常通知：afterThrowingPrintLog，异常是："+e);
+  }
+  @After("pointcut()")
+  public void afterPrintLog(){
+  	System.out.println("最终通知：afterPrintLog");
+  }
+  /**
+  * 环绕通知
+  * @param pjp
+  * @return
+  */
+  @Around("pointcut()")
+  public Object aroundPrintLog(ProceedingJoinPoint pjp){
+    //定义返回值
+    Object rtValue = null;
+    try{
+      //前置通知
+      System.out.println("前置通知");
+      //1.获取参数
+      Object[] args = pjp.getArgs();
+        //2.执⾏切⼊点⽅法
+      rtValue = pjp.proceed(args);
+      //后置通知
+      System.out.println("后置通知");
+    }catch (Throwable t){
+      //异常通知
+      System.out.println("异常通知");
+      t.printStackTrace();
+    }finally {
+      //最终通知
+      System.out.println("最终通知");
+    }
+    	return rtValue;
+    }
+  }
+```
+
+#### 使用注解
+
+在配置类中使用@EnableAspectJAutoProxy注解
+
+``` java
+@EnableAspectJAutoProxy //开启spring对注解AOP的⽀持
+public class SpringConfiguration {
+}
+```
+
+### 4、Spring对事务支持
+
+#### 事务概念：
+
+事务指逻辑上的⼀组操作，组成这组操作的各个单元，要么全部成功，要么全部不成功
+
+#### 事务的四⼤特性：
+
+**原⼦性（Atomicity）** 
+
+原⼦性是指事务是⼀个不可分割的⼯作单位，事务中的操作要么都发⽣，要么都不发⽣。
+
+**⼀致性（Consistency）** 
+
+事务必须使数据库从⼀个⼀致性状态变换到另外⼀个⼀致性状态。
+
+**隔离性（Isolation）**
+
+事务的隔离性是多个⽤户并发访问数据库时，数据库为每⼀个⽤户开启的事务，每个事务不能被其他事务的操作数据所⼲扰，多个并发事务之间要相互隔离。
+
+**持久性（Durability）**
+持久性是指⼀个事务⼀旦被提交，它对数据库中数据的改变就是永久性的，接下来即使数据库发⽣故障也不应该对其有任何影响。
+
+#### 事务隔离级别
+
+脏读：⼀个线程中的事务读到了另外⼀个线程中未提交的数据。
+
+不可重复读：⼀个线程中的事务读到了另外⼀个线程中已经提交的update的数据（前后内容不⼀样）
+
+虚读（幻读）：⼀个线程中的事务读到了另外⼀个线程中已经提交的insert或者delete的数据（前后条数不⼀样）
+
+数据库共定义了四种隔离级别：
+
+Serializable（串⾏化）：可避免脏读、不可重复读、虚读情况的发⽣。（串⾏化） 最⾼
+
+Repeatable read（可重复读）：可避免脏读、不可重复读情况的发⽣。(幻读有可能发⽣) 第⼆该机制下会对要update的⾏进⾏加锁
+
+Read committed（读已提交）：可避免脏读情况发⽣。不可重复读和幻读⼀定会发⽣。 第三
+
+Read uncommitted（读未提交）：最低级别，以上情况均⽆法保证。(读未提交) 最低
+
+MySQL的默认隔离级别是：REPEATABLE READ
+查询当前使⽤的隔离级别： select @@tx_isolation;
+设置MySQL事务的隔离级别： set session transaction isolation level xxx; （设置的是当前mysql连接会话的，并不是永久改变的）
+
+#### 事务传播行为
+
+事务往往在service层进⾏控制，如果出现service层⽅法A调⽤了另外⼀个service层⽅法B，A和B⽅法本身都已经被添加了事务控制，那么A调⽤B的时候，就需要进⾏事务的⼀些协商，这就叫做事务的传播⾏为。
+
+| PROPAGATION_REQUIRED      | 如果当前没有事务，就新建⼀个事务，如果已经存在⼀个事务中，加⼊到这个事务中。这是最常⻅的选择。 |
+| ------------------------- | ------------------------------------------------------------ |
+| PROPAGATION_SUPPORTS      | ⽀持当前事务，如果当前没有事务，就以⾮事务⽅式执⾏。         |
+| PROPAGATION_MANDATORY     | 使⽤当前的事务，如果当前没有事务，就抛出异常。               |
+| PROPAGATION_REQUIRES_NEW  | 新建事务，如果当前存在事务，把当前事务挂起。                 |
+| PROPAGATION_NOT_SUPPORTED | 以⾮事务⽅式执⾏操作，如果当前存在事务，就把当前事务挂起。   |
+| PROPAGATION_NEVER         | 以⾮事务⽅式执⾏，如果当前存在事务，则抛出异常。             |
+| PROPAGATION_NESTED        | 如果当前存在事务，则在嵌套事务内执⾏。如果当前没有事务，则执⾏与PROPAGATION_REQUIRED类似的操作。 |
 
 
 
